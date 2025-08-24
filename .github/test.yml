@@ -39,10 +39,12 @@ jobs:
             app/build/outputs
           key: android-${{ runner.os }}-${{ hashFiles('&zwnj;**/build.gradle', '**&zwnj;/settings.gradle') }}
           
-  
+      - id: get-project
+        name: Get project name
+        run: echo "PROJECT=$(cat project-to-build)" >> $GITHUB_OUTPUT
         
       - name: Clone project
-        run: git clone --depth=1 https://github.xyz/FongMi/TV
+        run: git clone --depth=1 ${{ steps.get-project.outputs.PROJECT }} project
         
       - name: Install GNU Parallel
         run: sudo apt-get install -y parallel
