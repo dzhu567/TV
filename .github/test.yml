@@ -1,0 +1,74 @@
+name: test Build
+on:
+  workflow_dispatch:
+    inputs:
+      channels:
+        description: '渠道列表 (逗号分隔)'
+        required: true
+        default: 'official,huawei,xiaomi'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      BUILD_PATH: ${{ github.workspace }}/project
+      
+    steps:
+      - name: Checkout the code
+        uses: actions/checkout@v4
+        
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('&zwnj;**/*.gradle*', '**&zwnj;/gradle-wrapper.properties') }}
+          
+      - name: Cache Android
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.android/build-cache
+            app/build/outputs
+          key: android-${{ runner.os }}-${{ hashFiles('&zwnj;**/build.gradle', '**&zwnj;/settings.gradle') }}
+          
+      - id: get-project
+        name: Get project name
+        run: echo "PROJECT=$(cat project-to-build)" >> $GITHUB_OUTPUT
+        
+      - name: Clone project
+        run: git clone --depth=1 ${{ steps.get-project.outputs.PROJECT }} project
+        
+      - name: Install GNU Parallel
+        run: sudo apt-get install -y parallel
+        
+      - name: Build multi-channel APKs
+        id: build
+        working-directory: ./project
+        run: |
+          if [ ! -f "gradlew" ]; then gradle wrapper; fi
+          chmod +x gradlew
+          
+          IFS=',' read -ra CHANNELS <<< "${{ github.event.inputs.channels }}"
+          parallel_args=()
+          for channel in "${CHANNELS[@]}"; do
+            parallel_args+=("./gradlew assemble${channel^}Debug -PbuildChannel=$channel --quiet")
+          done
+          parallel ::: "${parallel_args[@]}"
+          
+          find . -name '*.apk' | sed 's|^\./||' > apk_paths.txt
+          
+      - name: Upload APK Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: multi-channel-apks
+          path: |
+            ${{ env.BUILD_PATH }}/apk_paths.txt
+            ${{ env.BUILD_PATH }}/&zwnj;**/outputs/apk/**&zwnj;/*.apk
