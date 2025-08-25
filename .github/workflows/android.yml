@@ -1,11 +1,7 @@
 name: test Build
 on:
   workflow_dispatch:
-    inputs:
-      channels:
-        description: '渠道列表 (逗号分隔)'
-        required: true
-        default: 'official,huawei,xiaomi'
+    
 
 jobs:
   build:
